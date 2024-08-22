@@ -63,9 +63,8 @@ def get_doctor(doctor_id):
 
 def get_all_doctors():
     doctors = Doctor.query.all()
-    doctors_data = []
-    for doctor in doctors:
-        doctor_data = {
+    doctors_data = [
+        {
             "id": doctor.id,
             "name": doctor.name,
             "username": doctor.username,
@@ -74,7 +73,8 @@ def get_all_doctors():
             "work_start_time": doctor.work_start_time.isoformat(),
             "work_end_time": doctor.work_end_time.isoformat(),
         }
-        doctors_data.append(doctor_data)
+        for doctor in doctors
+    ]
     return jsonify(doctors_data), 200
 
 

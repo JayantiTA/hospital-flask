@@ -5,6 +5,7 @@ import atexit
 from app.modules.main.route import main_bp
 from app.db.db import db
 from app.controllers.patients_controller import update_patients_from_bigquery
+from app.models.employee import Employee
 from app.routes.patients import patients_bp
 from app.routes.doctors import doctors_bp
 from app.routes.employees import employees_bp
@@ -33,12 +34,19 @@ def initialize_auth(app: Flask):
         login_manager = LoginManager()
         login_manager.init_app(app)
 
+        @login_manager.user_loader
+        def load_user(user_id):
+            return Employee.query.get(str(user_id))
+
 
 def start_scheduler(app):
     with app.app_context():
         scheduler = BackgroundScheduler()
         scheduler.add_job(
-            func=update_patients_from_bigquery, trigger="interval", hours=24
+            func=update_patients_from_bigquery,
+            trigger="cron",
+            hour=0,
+            minute=0,
         )
         scheduler.start()
 

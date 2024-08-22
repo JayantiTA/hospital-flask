@@ -3,6 +3,7 @@ from flask_login import login_user, logout_user
 from datetime import datetime
 from app.db.db import db
 from app.models.employee import Employee
+from flask_login import login_required
 
 
 def login():
@@ -17,7 +18,7 @@ def login():
     else:
         return jsonify({"error": "Invalid credential"}), 401
 
-
+@login_required
 def logout():
     logout_user()
     return jsonify({"message": "Logged out successfully"}), 200
@@ -75,16 +76,16 @@ def get_employee(employee_id):
 
 def get_all_employees():
     employees = Employee.query.all()
-    employees_data = []
-    for employee in employees:
-        employee_data = {
+    employees_data = [
+        {
             "id": employee.id,
             "name": employee.name,
             "username": employee.username,
             "gender": employee.gender,
             "birthdate": employee.birthdate.isoformat(),
         }
-        employees_data.append(employee_data)
+        for employee in employees
+    ]
     return jsonify(employees_data), 200
 
 

@@ -3,10 +3,36 @@ from app.db.db import db
 from app.models.appointment import Appointment
 from app.models.doctor import Doctor
 from app.models.patient import Patient
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 VALID_STATUSES = ["IN_QUEUE", "DONE", "CANCELLED"]
+
+
+def is_time_available_for_appointment(doctor_id, new_appointment_datetime):
+    previous_appointment = Appointment.query.filter(
+        Appointment.doctor_id == doctor_id,
+        Appointment.datetime <= new_appointment_datetime
+    ).order_by(Appointment.datetime.desc()).first()
+
+    next_appointment = Appointment.query.filter(
+        Appointment.doctor_id == doctor_id,
+        Appointment.datetime >= new_appointment_datetime
+    ).order_by(Appointment.datetime.asc()).first()
+
+    # Check if the time difference with the previous appointment is at least 30 minutes
+    if previous_appointment:
+        time_diff = new_appointment_datetime - previous_appointment.datetime
+        if time_diff < timedelta(minutes=30):
+            return False
+
+    # Check if the time difference with the next appointment is at least 30 minutes
+    if next_appointment:
+        time_diff = next_appointment.datetime - new_appointment_datetime
+        if time_diff < timedelta(minutes=30):
+            return False
+
+    return True
 
 
 def create_appointment():
@@ -41,14 +67,8 @@ def create_appointment():
         return jsonify({"error": "Doctor not found"}), 404
 
     # Check for overlapping appointments (ignoring seconds)
-    overlapping_appointments = Appointment.query.filter(
-        Appointment.doctor_id == doctor_id,
-        db.extract("hour", Appointment.datetime) == appointment_datetime.hour,
-        db.extract("minute", Appointment.datetime) == appointment_datetime.minute,
-    ).all()
-
-    if overlapping_appointments:
-        return jsonify({"error": "Doctor is already booked at this time"}), 400
+    if not is_time_available_for_appointment(doctor_id, appointment_datetime):
+        return jsonify({"error": "Doctor is already booked within 30 minutes of this time"}), 400
 
     # Check if the appointment time is within doctor's working hours
     if not (doctor.work_start_time <= appointment_time <= doctor.work_end_time):
@@ -88,7 +108,19 @@ def get_appointment(appointment_id):
 
 def get_all_appointments():
     appointments = Appointment.query.all()
-    return jsonify(appointments), 200
+    appointments_data = [
+        {
+            "id": appoinment.id,
+            "patient_id": appoinment.patient_id,
+            "doctor_id": appoinment.doctor_id,
+            "datetime": appoinment.datetime.isoformat(),
+            "status": appoinment.status,
+            "diagnose": appoinment.diagnose,
+            "notes": appoinment.notes,
+        }
+        for appoinment in appointments
+    ]
+    return jsonify(appointments_data), 200
 
 
 def update_appointment(appointment_id):

@@ -12,11 +12,12 @@ def create_patient():
     birthdate_str = data.get("birthdate")
     no_ktp = data.get("no_ktp")
     address = data.get("address")
-    vaccine_type = data.get("vaccine_type")
-    vaccine_count = data.get("vaccine_count")
 
     if not all([name, gender, birthdate_str, no_ktp, address]):
         return jsonify({"error": "Missing data"}), 400
+
+    if len(no_ktp) != 16 or no_ktp.isdigit() is False:
+        return jsonify({"error": "Invalid no KTP"}), 400
 
     try:
         birthdate = datetime.strptime(birthdate_str, "%Y-%m-%d").date()
@@ -32,8 +33,6 @@ def create_patient():
         birthdate=birthdate,
         no_ktp=no_ktp,
         address=address,
-        vaccine_type=vaccine_type,
-        vaccine_count=vaccine_count,
     )
     db.session.add(new_patient)
     db.session.commit()
@@ -60,7 +59,20 @@ def get_patient(patient_id):
 
 def get_all_patients():
     patients = Patient.query.all()
-    return jsonify(patients), 200
+    patients_data = [
+        {
+             "id": patient.id,
+            "name": patient.name,
+            "gender": patient.gender,
+            "birthdate": patient.birthdate.isoformat(),
+            "no_ktp": patient.no_ktp,
+            "address": patient.address,
+            "vaccine_type": patient.vaccine_type,
+            "vaccine_count": patient.vaccine_count,
+        }
+        for patient in patients
+    ]
+    return jsonify(patients_data), 200
 
 
 def update_patient(patient_id):
@@ -74,8 +86,6 @@ def update_patient(patient_id):
     birthdate_str = data.get("birthdate")
     no_ktp = data.get("no_ktp")
     address = data.get("address")
-    vaccine_type = data.get("vaccine_type")
-    vaccine_count = data.get("vaccine_count")
 
     if birthdate_str:
         try:
@@ -93,10 +103,6 @@ def update_patient(patient_id):
         patient.no_ktp = no_ktp
     if address:
         patient.address = address
-    if vaccine_type:
-        patient.vaccine_type = vaccine_type
-    if vaccine_count is not None:
-        patient.vaccine_count = vaccine_count
 
     db.session.commit()
     return jsonify({"message": "Patient updated successfully"}), 200
@@ -124,7 +130,7 @@ def update_patients_from_bigquery():
     results = query_job.result()
 
     for row in results:
-        patient = Patient.query.filter_by(no_ktp=row.no_ktp).first()
+        patient = Patient.query.filter_by(no_ktp=row.no_ktp).with_for_update().first()
         if patient:
             patient.name = row.full_name
             patient.birthdate = row.birthdate
